@@ -2,6 +2,7 @@
 # ULL - 19/10/2022
 # Sergio Guerra Arencibia
 
+from sympy import *
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -11,7 +12,7 @@ RADIUS_SUN = 696340  # Solar radius in km
 GAMMA = 5/3          # Adiabatic index
 DELTAZ = 23.3        # Model provided has a delta z of 23.3
 DELTAX = 23.3        # We set the delta x equal to delta z
-FRECUENCIES = [0.002, 0.003, 0.0035, 0.005]   # Frecuencies in Hz
+FRECUENCIES = np.array([0.002, 0.003, 0.0035, 0.005])   # Frecuencies in Hz
 ZLTP = 500           # Z value where we calculate the LTP
 
 # Function for plotting 2 magnitudes
@@ -30,22 +31,49 @@ def modelZtoRadius(zValues):
     return (RADIUS_SUN + zValues) / RADIUS_SUN
 
 # RK4 generic method for a system of 4 equations
-def rk4(function, initialValues, t0, tf, step):
-    times = np.linspace(t0, tf, step)
-    deltaT = times[1] - times[0]
-    values = np.zeros(shape=(4, n))
+def rk4(function, initialValues, t0, tf, steps):
+    t = np.linspace(t0, tf, steps)
+    deltaT = t[1] - t[0]
+    values = np.zeros(shape=(4, steps))
     values[0, 0] = initialValues[0]
     values[1, 0] = initialValues[1]
     values[2, 0] = initialValues[2]
     values[3, 0] = initialValues[3]
 
-    for i in range(1, n):
+    for i in range(1, steps):
         k1 = function(t[i-1], *values[:, i-1])
         k2 = function(t[i-1] + 0.5*deltaT, *values[:, i-1] + 0.5*k1*deltaT)
         k3 = function(t[i-1] + 0.5*deltaT, *values[:, i-1] + 0.5*k2*deltaT)
         k4 = function(t[i-1] + deltaT, *values[:, i-1] + k3*deltaT)
         values[:, i] = values[:, i-1] + (1/6)*deltaT*(k1 + 2*k2 + 2*k3 + k4)
     return (values)
+
+# Function to integrate
+def fFunction(t, x, z, kx, kz):
+    index = np.argmin(np.abs(z - zArray))
+
+    dkx_ds = 0
+
+
+    dx_ds = (kx * (cs[index]**2)) + (0.5*(2*kx*(((kx**2) + (kz**2))*(cs[index]**2) +( wc[index]**2)) * (cs[index]**2) - (4*kx*(cs[index]**2)*(n[index]**2)))) \
+        /(np.sqrt(-4*(kx**2)*(cs[index]**2)*(n[index]**2) + ((cs[index]**2)*(kx**2 + kz**2) +( wc[index]**2))**2 ))
+
+
+    dz_ds = (kz * (cs[index]**2)) + ( kz * (cs[index]**2) * ((kx**2 + kz**2)*(cs[index]**2) + (wc[index]**2)) ) \
+        / (np.sqrt( -4*(kx**2)*(cs[index]**2)*(n[index]**2) + ((kx**2 + kz**2) * (cs[index]**2) + (wc[index]**2) )**2) )
+
+
+    dkz_ds = (kx**2 + kz**2) * cs[index] * gradcs[index] + (wc[index] * gradwc[index]) + \
+        (0.5 *( ( -4*(kx**2)*(cs[index]**2)*n[index]*gradn[index] ) - (4*(kx**2)*cs[index]*(n[index]**2)*gradcs[index] ) + \
+        ( ( ((kx**2 + kz**2)*(cs[index]**2) + (wc[index]**2)) * (4*(kx**2 + kz**2)*cs[index]*gradcs[index] + 4*wc[index]*gradwc[index]) ) / 2)        ) ) / \
+        ( np.sqrt( -4*(kx**2)*(cs[index]**2)*(n[index]**2) + ((kx**2 + kz**2)*(cs[index]**2) + (wc[index]**2))**2 ) )
+
+    # dkz_ds = -dkz_ds
+    dz_ds = -dz_ds
+    print("Devuelvo: ", np.array([dx_ds, dz_ds, dkx_ds, dkz_ds]))
+    return np.array([dx_ds, dz_ds, dkx_ds, dkz_ds])
+
+# results = rk4(fFunction, [0, zArray[ZLTP], k_xArray[0], 0], 0, 1000, 3)
 
 # -------------------------------------------------------------------------
 # Reading the model data
@@ -74,13 +102,13 @@ with open("model_jcd.dat") as openFileObject:
 
 # -------------------------------------------------------------------------
 # Sound velocity
-soundVelocity = np.array([])
+cs = np.array([])
 
 def soundVelocityFormula(preassure, density):
     cs = (GAMMA * preassure) / density
     return(np.sqrt(cs))
-soundVelocity = soundVelocityFormula(pArray, rhoArray)
-# plotMagnitudes(modelZtoRadius(zArray), soundVelocity)
+cs = soundVelocityFormula(pArray, rhoArray)
+# plotMagnitudes(modelZtoRadius(zArray), cs)
 
 # Height scale
 sunGravity = 274 # m/s**2
@@ -95,8 +123,8 @@ scaleHeight = heightScaleFormula(pArray, rhoArray)
 # w_c
 def wcFormula(cs, h):
     return (cs / (2 * h))
-w_c = wcFormula(soundVelocity, scaleHeight)
-# plotMagnitudes(modelZtoRadius(zArray), w_c)
+wc = wcFormula(cs, scaleHeight)
+# plotMagnitudes(modelZtoRadius(zArray), wc)
 
 # N
 def bruntVaisala (h):
@@ -109,9 +137,9 @@ n = bruntVaisala(scaleHeight)
 
 # Get the external Z at which the wave reflects
 externalZ = np.array([])
-frecuencyw_c = w_c / (2*np.pi)
+frecuencyw_c = wc / (2*np.pi)
 for i in range(len(FRECUENCIES)):
-    for j in range(len(w_c)):
+    for j in range(len(wc)):
         if (np.abs(FRECUENCIES[i] - frecuencyw_c[j]) < EPS):
             externalZ = np.append(externalZ, zArray[j])
             break
@@ -121,5 +149,33 @@ for i in range(len(FRECUENCIES)):
 # We get it from the LTP expression, where we know that k_z = 0
 k_xArray = np.array([])  # Units will be cm^-1
 for i in range(len(FRECUENCIES)):
-    k_xArray = np.append(k_xArray, (2*np.pi*FRECUENCIES[i]) / soundVelocity[ZLTP])
-print(k_xArray)
+    k_xArray = np.append(k_xArray, (2*np.pi*FRECUENCIES[i]) / cs[ZLTP])
+# print(k_xArray)
+
+# -------------------------------------------------------
+
+# Derivation
+# x, z, kx, kz, w = symbols('x z kx kz w')
+# csSym = Function('cs')(z)
+# wcSym = Function('wc')(z)
+# nSym = Function('n')(z)
+
+# firstMember = (csSym**2 * (kx**2 + kz**2) + wcSym**2) / 2
+# insideRoot = (csSym**2 * (kx**2 + kz**2) + wcSym**2)**2 - (4 * csSym**2 * nSym**2 * kx**2)
+# secondMember = 0.5*sqrt(insideRoot) - w**2
+# f = firstMember + secondMember
+
+# This way we can see the derivatives and create the function to integrate
+# print(f.diff(x))
+# print(f.diff(z))
+# print(f.diff(kx))
+# print(f.diff(kz))
+
+# Numeric integration
+
+gradcs = np.gradient(cs, -DELTAZ)
+gradwc = np.gradient(wc, -DELTAZ)
+gradn = np.gradient(n, -DELTAZ)
+
+results = rk4(fFunction, [0, zArray[ZLTP], k_xArray[0], 0], 0, 1, 100)
+plotMagnitudes(results[0], results[1])
