@@ -70,7 +70,6 @@ def fFunction(t, x, z, kx, kz):
 
     # dkz_ds = -dkz_ds
     dz_ds = -dz_ds
-    print("Devuelvo: ", np.array([dx_ds, dz_ds, dkx_ds, dkz_ds]))
     return np.array([dx_ds, dz_ds, dkx_ds, dkz_ds])
 
 # results = rk4(fFunction, [0, zArray[ZLTP], k_xArray[0], 0], 0, 1000, 3)
@@ -177,5 +176,20 @@ gradcs = np.gradient(cs, -DELTAZ)
 gradwc = np.gradient(wc, -DELTAZ)
 gradn = np.gradient(n, -DELTAZ)
 
-results = rk4(fFunction, [0, zArray[ZLTP], k_xArray[0], 0], 0, 1, 100)
-plotMagnitudes(results[0], results[1])
+results1 = rk4(fFunction, [0, zArray[ZLTP], k_xArray[0], 0], 0, 2, 1000)
+results2 = rk4(fFunction, [0, zArray[ZLTP], k_xArray[1], 0], 0, 2, 1000)
+results3 = rk4(fFunction, [0, zArray[ZLTP], k_xArray[2], 0], 0, 2, 1000)
+results4 = rk4(fFunction, [0, zArray[ZLTP], k_xArray[3], 0], 0, 2, 1000)
+
+fig, ax = plt.subplots()
+fig.set_figheight(10)
+fig.set_figwidth(15)
+ax.set_xlabel('Distancia [km]')
+ax.set_ylabel('Altura [km]', rotation = 90)
+ax.yaxis.label.set_size(15)
+ax.xaxis.label.set_size(15)
+ax.plot(results1[0], results1[1], color='blueviolet')
+ax.plot(results2[0], results2[1], color='cadetblue')
+ax.plot(results3[0], results3[1], color='gold')
+ax.plot(results4[0], results4[1], color='peru')
+plt.show()
